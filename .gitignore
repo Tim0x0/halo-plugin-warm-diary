@@ -94,7 +94,9 @@ skills-lock.json
 
 # Design drafts and static prototypes (not shipped)
 prototypes/
-docs/
+docs/*
+!docs/diary-visitor.png
+!docs/diary-owner.png
 
 # Windows
 Thumbs.db

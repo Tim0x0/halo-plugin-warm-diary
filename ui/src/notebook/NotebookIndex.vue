@@ -49,8 +49,9 @@ const {
 <template>
   <aside class="nb-index">
     <div class="nb-index-title">
-      {{ monthLabel }}<span v-if="!filtered && !listing" class="nb-index-count">{{ total }} 篇</span
-      ><span class="nb-eyebrow">{{ mine ? 'FOR MYSELF' : 'SHARED PAGES' }}</span>
+      <span v-if="monthLabel">{{ monthLabel }}</span
+      ><span class="nb-eyebrow">{{ mine ? 'FOR MYSELF' : 'SHARED PAGES' }}</span
+      ><span v-if="!filtered && !listing" class="nb-index-count">{{ total }} 篇</span>
     </div>
     <p class="nb-index-sub nb-eyebrow">LITTLE THINGS, BIG MEMORIES</p>
     <template v-if="accessible && !editing">

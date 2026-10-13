@@ -60,7 +60,7 @@ export function useNotebook(canLeave: () => Promise<boolean>) {
   const filtered = computed(
     () => !!(queryText('q') || month.value || selectedDate.value || visibility.value !== 'all'),
   )
-  const monthLabel = computed(() => (month.value ? `${monthTitle(month.value)}手记` : '日常手记'))
+  const monthLabel = computed(() => (month.value ? `${monthTitle(month.value)}手记` : ''))
   /** 筛选摘要：关键词、日期、状态，没有就不显示。关键词取已提交的搜索，输入过程中不变。 */
   const filterSummary = computed(() =>
     [
