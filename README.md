@@ -10,7 +10,7 @@
 
 ## 安装与使用
 
-在 Console 的「插件」中上传 `build/libs/plugin-warm-diary-0.1.0-alpha.6.jar` 并启用。
+在 Console 的「插件」中上传 `build/libs/plugin-warm-diary-1.0.0.jar` 并启用。
 
 1. 首次打开 Console 内容菜单里的「日记」，点击「开始使用暖阳日记」。当前超级管理员成为唯一日记主人，一次性，不能重新认领。
 2. 在后台或 `/diary` 写日记。日期可以补写，一天可以写多篇；标题、心情、天气都可以留空。
