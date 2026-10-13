@@ -1,0 +1,100 @@
+/* 暖阳日记后台。类名统一用 wd- 前缀；提示、错误和说明用 Halo 组件和灰字，内容区只复用编辑器正文框的边框。 */
+.wd-editor-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.wd-editor-fields > .formkit-outer {
+  padding: 0 !important;
+}
+/* 弹窗内容区纵向排列，正文编辑器占满字段以下的空间。 */
+.wd-editor-modal .modal-body {
+  display: flex;
+  flex-direction: column;
+}
+.wd-editor-modal .modal-body > :not(.wd-editor-fields) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+/* 页脚和 Halo 的文章设置弹窗一样：按钮靠左，状态文字靠右。 */
+.wd-modal-footer {
+  flex-wrap: wrap;
+  align-items: center;
+  width: 100%;
+}
+.wd-modal-footer > span {
+  margin-left: auto;
+  color: #667085;
+  font-size: 12px;
+}
+/* 正文字号和墨色与编辑器正文一致（16px、#1f2328），阅读时行距略松。 */
+.wd-prose {
+  color: #1f2328;
+  font-size: 16px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.wd-prose p,
+.wd-prose blockquote,
+.wd-prose ul,
+.wd-prose ol {
+  margin: 0 0 1em;
+}
+.wd-prose blockquote {
+  padding-left: 16px;
+  border-left: 3px solid #cbd5e1;
+}
+.wd-prose ul {
+  padding-left: 24px;
+  list-style: disc;
+}
+.wd-prose ol {
+  padding-left: 24px;
+  list-style: decimal;
+}
+.wd-reading-meta,
+.wd-hint {
+  margin-bottom: 16px;
+  color: #667085;
+  font-size: 13px;
+}
+.wd-hint {
+  margin-bottom: 12px;
+}
+/* 分享确认的正文放在描述列表最后一项里，完整显示，段落换行保持原样。 */
+.wd-share-body {
+  font-size: 14px;
+  line-height: 1.75;
+}
+.wd-share-body > :last-child {
+  margin-bottom: 0;
+}
+/* 版本冲突时服务器上的最新版本，用一条分隔线和编辑区隔开。 */
+.wd-latest {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #eaecf0;
+}
+.wd-latest h3 {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+@media (max-width: 640px) {
+  .wd-editor-fields {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .wd-modal-footer > span {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+  .wd-console .wd-diary-title {
+    max-width: calc(100vw - 180px) !important;
+  }
+}
+.wd-console .wd-diary-title .entity-field-title {
+  cursor: pointer;
+}

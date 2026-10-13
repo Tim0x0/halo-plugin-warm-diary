@@ -1,0 +1,33 @@
+apiVersion: v1alpha1
+kind: Role
+metadata:
+  name: warm-diary-public
+  labels:
+    halo.run/role-template: "true"
+    halo.run/hidden: "true"
+    rbac.authorization.halo.run/aggregate-to-anonymous: "true"
+    rbac.authorization.halo.run/aggregate-to-authenticated: "true"
+rules:
+  - apiGroups: ["api.warm-diary.timxs.com"]
+    resources: ["readableentries", "readablecalendar", "session"]
+    verbs: ["get", "list"]
+  - nonResourceURLs: ["/diary", "/diary/*"]
+    verbs: ["get"]
+---
+apiVersion: v1alpha1
+kind: Role
+metadata:
+  name: warm-diary-owner-endpoints
+  labels:
+    halo.run/role-template: "true"
+    halo.run/hidden: "true"
+    rbac.authorization.halo.run/aggregate-to-authenticated: "true"
+rules:
+  # Entry points only: every handler checks the single notebook owner.
+  # Never grant roles access to raw diaryentries / diarynotebooks CRDs.
+  - apiGroups: ["console.api.warm-diary.timxs.com"]
+    resources: ["entries"]
+    verbs: ["get", "list", "create", "update"]
+  - apiGroups: ["console.api.warm-diary.timxs.com"]
+    resources: ["entries/publish", "entries/unpublish", "entries/trash", "entries/restore", "entries/delete", "notebooks/initialize"]
+    verbs: ["create"]

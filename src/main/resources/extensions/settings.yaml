@@ -1,0 +1,24 @@
+apiVersion: v1alpha1
+kind: Setting
+metadata:
+  name: warm-diary-settings
+spec:
+  forms:
+    - group: basic
+      label: 日记设置
+      formSchema:
+        - $formkit: text
+          name: timeZone
+          label: 日记时区
+          value: ""
+          placeholder: Asia/Shanghai
+          help: 留空使用 Halo 服务端时区。前后台的“今天”保持一致，已有日记日期不会移动。
+          validation: length:0,80
+        - $formkit: textarea
+          name: stickyNote
+          label: 手帐便笺
+          value: |-
+            不必写得漂亮，
+            真实就很好。
+          help: 显示在前台日记目录左侧。留空则使用默认文案。
+          validation: length:0,200

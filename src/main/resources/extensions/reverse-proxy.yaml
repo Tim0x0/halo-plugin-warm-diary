@@ -1,0 +1,8 @@
+apiVersion: plugin.halo.run/v1alpha1
+kind: ReverseProxy
+metadata:
+  name: warm-diary-assets
+rules:
+  - path: /notebook/**
+    file:
+      directory: static/notebook

@@ -1,0 +1,22 @@
+# Refer https://docs.halo.run/developer-guide/plugin/basics/manifest
+
+apiVersion: plugin.halo.run/v1alpha1
+kind: Plugin
+metadata:
+  # The name defines how the plugin is invoked, A unique name
+  name: warm-diary
+spec:
+  enabled: true
+  settingName: warm-diary-settings
+  configMapName: warm-diary-configmap
+  requires: ">=2.26.0"
+  author:
+    name: Tim0x0
+    website: https://timxs.com
+  logo: logo.svg
+  homepage: https://timxs.com
+  displayName: "暖阳日记"
+  description: "写给自己的纸本手帐，留住日常里的小小暖意。"
+  license:
+    - name: "GPL-3.0"
+      url: "https://www.gnu.org/licenses/gpl-3.0.html"
