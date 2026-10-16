@@ -16,7 +16,7 @@ function queryText(value: LocationQueryValue | LocationQueryValue[] | undefined)
   return (Array.isArray(value) ? value[0] : value) || ''
 }
 
-export function useConsoleEntries(owner: Ref<boolean>) {
+export function useConsoleEntries(manage: Ref<boolean>) {
   const route = useRoute()
   const router = useRouter()
   const trash = computed(() => route.name === 'WarmDiaryTrash')
@@ -104,7 +104,7 @@ export function useConsoleEntries(owner: Ref<boolean>) {
   })
 
   async function load() {
-    if (!owner.value || disposed) return
+    if (!manage.value || disposed) return
     const request = ++requestId
     loading.value = true
     error.value = ''
@@ -133,10 +133,10 @@ export function useConsoleEntries(owner: Ref<boolean>) {
   }
 
   watch(
-    [owner, queryKey],
+    [manage, queryKey],
     () => {
       selectedNames.value = []
-      if (owner.value) void load()
+      if (manage.value) void load()
       else {
         requestId++
         data.value = { items: [], total: 0, page: 1, size: 20 }
@@ -152,7 +152,7 @@ export function useConsoleEntries(owner: Ref<boolean>) {
 
   const mutating = ref(false)
   async function operate(entries: { name: string; version: string }[], operation: EntryOperation) {
-    if (mutating.value || !owner.value || disposed || !entries.length) return
+    if (mutating.value || !manage.value || disposed || !entries.length) return
     mutating.value = true
     // Capture exactly the reviewed selection and versions; never act on another page.
     const targets = [...entries]

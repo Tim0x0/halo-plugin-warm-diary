@@ -68,8 +68,8 @@ export function message(error: unknown, options?: { keepInput?: boolean }): stri
       : '日记已在其他页面修改，列表已刷新，请核对后重试。'
   if (status === 401 || status === 403)
     return keepInput
-      ? '登录已失效或当前账号不是日记主人。请重新登录后重试，当前输入已保留。'
-      : '登录已失效或没有权限，请重新登录后重试。'
+      ? '登录已失效或当前账号没有日记管理权限。请重新登录后重试，当前输入已保留。'
+      : '登录已失效或没有日记管理权限，请重新登录后重试。'
   const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
   if (keepInput) return detail || '操作失败，请检查网络后重试。当前输入已保留。'
   return detail || '请检查网络后重试。'

@@ -4,12 +4,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.function.server.HandlerStrategies;
 import org.springframework.web.reactive.result.view.View;
-import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import run.halo.app.extension.ReactiveExtensionClient;
 import run.halo.app.theme.TemplateNameResolver;
@@ -48,13 +46,11 @@ class DiaryPageControllerTest {
             .build();
     }
 
-    private void session(boolean owner, boolean loggedIn) {
-        when(access.isOwner()).thenReturn(Mono.just(owner));
-        when(access.requireOwner()).thenReturn(owner
-            ? Mono.just("owner")
-            : Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "只有日记主人可以访问")));
+    /** 页面本身对所有身份都渲染；能不能看到正文由角色决定。 */
+    private void session(boolean canManage, boolean loggedIn) {
+        when(access.canManage()).thenReturn(Mono.just(canManage));
         when(access.session()).thenReturn(Mono.just(
-            new DiaryAccess.Session(true, owner, loggedIn, "Asia/Shanghai", "2026-09-20", false)));
+            new DiaryAccess.Session(canManage, loggedIn, "Asia/Shanghai", "2026-09-20")));
     }
 
     private String store(DiaryEntry entry) {
@@ -64,7 +60,7 @@ class DiaryPageControllerTest {
     }
 
     @Test
-    void ownerCanOpenPrivateEntryAtTheCanonicalUrl() {
+    void managerCanOpenPrivateEntryAtTheCanonicalUrl() {
         String path = store(DiaryPrivacyTest.entry());
         web.get().uri(path).exchange().expectStatus().isOk()
             .expectHeader().valueEquals("Cache-Control", "private, no-store")
@@ -111,7 +107,7 @@ class DiaryPageControllerTest {
     }
 
     @Test
-    void trashedEntryIsNotReadableEvenByOwner() {
+    void trashedEntryIsNotReadableEvenForTheManager() {
         var entry = DiaryPrivacyTest.entry();
         DiaryService.applyAction(entry, "trash", Instant.now());
         String path = store(entry);

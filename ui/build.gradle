@@ -7,7 +7,7 @@ group 'com.timxs.warmdiary.ui'
 
 tasks.register('pnpmBuild', PnpmTask) {
     group = 'build'
-    description = 'Build the Console UI and notebook using the official Halo bundler and Vite'
+    description = 'Build the UI project using pnpm'
     args = ['build']
     dependsOn tasks.named('pnpmInstall')
     inputs.dir(layout.projectDirectory.dir('src'))

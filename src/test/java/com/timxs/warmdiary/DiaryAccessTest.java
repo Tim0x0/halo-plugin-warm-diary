@@ -1,118 +1,76 @@
 package com.timxs.warmdiary;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
-import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import run.halo.app.core.user.service.UserService;
-import run.halo.app.extension.ReactiveExtensionClient;
 import run.halo.app.plugin.ReactiveSettingFetcher;
 
 class DiaryAccessTest {
-    @Test
-    void sessionExposesInitializationPermissionWithoutTreatingLoginAsOwnership() {
-        var client = mock(ReactiveExtensionClient.class);
-        var users = mock(UserService.class);
-        var settings = mock(ReactiveSettingFetcher.class);
+    private final UserService users = mock(UserService.class);
+    private final ReactiveSettingFetcher settings = mock(ReactiveSettingFetcher.class);
+
+    private DiaryAccess access(boolean manage) {
         when(settings.fetch(eq("basic"), eq(DiaryAccess.BasicSettings.class)))
             .thenReturn(Mono.just(new DiaryAccess.BasicSettings("Asia/Shanghai", null)));
-        when(client.fetch(DiaryNotebook.class, DiaryNotebook.NAME)).thenReturn(Mono.empty());
-        when(users.hasSufficientRoles(any())).thenReturn(Mono.just(true));
-        var access = new DiaryAccess(client, users, settings);
-        var admin = UsernamePasswordAuthenticationToken.authenticated("admin", "", List.of());
+        when(users.hasSufficientRoles(any())).thenReturn(Mono.just(manage));
+        return new DiaryAccess(users, settings);
+    }
 
-        StepVerifier.create(access.session().contextWrite(ReactiveSecurityContextHolder.withAuthentication(admin)))
+    private static UsernamePasswordAuthenticationToken account(String name) {
+        return UsernamePasswordAuthenticationToken.authenticated(name, "", List.of());
+    }
+
+    @Test
+    void sessionReportsManagePermissionFromRolesNotFromLogin() {
+        StepVerifier.create(access(true).session().contextWrite(ReactiveSecurityContextHolder.withAuthentication(account("admin"))))
             .assertNext(session -> assertThat(session)
-                .extracting(DiaryAccess.Session::initialized, DiaryAccess.Session::isOwner,
-                    DiaryAccess.Session::loggedIn, DiaryAccess.Session::canInitialize)
-                .containsExactly(false, false, true, true))
+                .extracting(DiaryAccess.Session::canManage, DiaryAccess.Session::loggedIn)
+                .containsExactly(true, true))
             .verifyComplete();
 
-        when(users.hasSufficientRoles(any())).thenReturn(Mono.just(false));
-        var reader = UsernamePasswordAuthenticationToken.authenticated("reader", "", List.of());
-        StepVerifier.create(access.session().contextWrite(ReactiveSecurityContextHolder.withAuthentication(reader)))
-            .assertNext(session -> assertThat(session.canInitialize()).isFalse())
-            .verifyComplete();
-
-        StepVerifier.create(access.session())
+        StepVerifier.create(access(false).session().contextWrite(ReactiveSecurityContextHolder.withAuthentication(account("reader"))))
             .assertNext(session -> assertThat(session)
-                .extracting(DiaryAccess.Session::initialized, DiaryAccess.Session::loggedIn,
-                    DiaryAccess.Session::canInitialize)
-                .containsExactly(false, false, false))
+                .extracting(DiaryAccess.Session::canManage, DiaryAccess.Session::loggedIn)
+                .containsExactly(false, true))
+            .verifyComplete();
+
+        StepVerifier.create(access(false).session())
+            .assertNext(session -> assertThat(session)
+                .extracting(DiaryAccess.Session::canManage, DiaryAccess.Session::loggedIn)
+                .containsExactly(false, false))
             .verifyComplete();
     }
 
     @Test
-    void initializedNotebookCannotBeClaimedAgainByAnyAccount() {
-        var client = mock(ReactiveExtensionClient.class);
-        var users = mock(UserService.class);
-        var settings = mock(ReactiveSettingFetcher.class);
-        when(settings.fetch(eq("basic"), eq(DiaryAccess.BasicSettings.class)))
-            .thenReturn(Mono.just(new DiaryAccess.BasicSettings("Asia/Shanghai", null)));
-        when(client.fetch(DiaryNotebook.class, DiaryNotebook.NAME))
-            .thenReturn(Mono.just(DiaryPrivacyTest.notebook()));
-        var access = new DiaryAccess(client, users, settings);
-
-        for (String name : List.of("owner", "other-admin")) {
-            var account = UsernamePasswordAuthenticationToken.authenticated(name, "", List.of());
-            StepVerifier.create(access.session().contextWrite(ReactiveSecurityContextHolder.withAuthentication(account)))
-                .assertNext(session -> assertThat(session)
-                    .extracting(DiaryAccess.Session::initialized, DiaryAccess.Session::isOwner,
-                        DiaryAccess.Session::canInitialize)
-                    .containsExactly(true, name.equals("owner"), false))
-                .verifyComplete();
-        }
-        StepVerifier.create(access.session())
-            .assertNext(session -> assertThat(session.canInitialize()).isFalse())
-            .verifyComplete();
-        verifyNoInteractions(users);
-
-        when(users.hasSufficientRoles(any())).thenReturn(Mono.just(true));
-        var otherAdmin = UsernamePasswordAuthenticationToken.authenticated("other-admin", "", List.of());
-        StepVerifier.create(access.initialize().contextWrite(ReactiveSecurityContextHolder.withAuthentication(otherAdmin)))
-            .expectErrorSatisfies(error -> assertThat(error)
-                .isInstanceOfSatisfying(ResponseStatusException.class,
-                    response -> assertThat(response.getStatusCode().value()).isEqualTo(409)))
-            .verify();
-        verify(client, never()).create(any(DiaryNotebook.class));
+    void canManageAsksHaloForTheManageRoleSoSuperAdminsPassAutomatically() {
+        var access = access(true);
+        StepVerifier.create(access.canManage()).expectNext(true).verifyComplete();
+        verify(users).hasSufficientRoles(Set.of(DiaryAccess.MANAGE_ROLE));
     }
 
     @Test
-    void loginAloneDoesNotGrantPrivateAccess() {
-        var client = mock(ReactiveExtensionClient.class);
-        when(client.fetch(DiaryNotebook.class, DiaryNotebook.NAME)).thenReturn(Mono.just(DiaryPrivacyTest.notebook()));
-        var access = new DiaryAccess(client, mock(UserService.class), mock(ReactiveSettingFetcher.class));
-        StepVerifier.create(access.requireOwner()).expectError(ResponseStatusException.class).verify();
-        var other = UsernamePasswordAuthenticationToken.authenticated("other", "", List.of());
-        StepVerifier.create(access.requireOwner().contextWrite(ReactiveSecurityContextHolder.withAuthentication(other)))
-            .expectError(ResponseStatusException.class).verify();
-        var owner = UsernamePasswordAuthenticationToken.authenticated("owner", "", List.of());
-        StepVerifier.create(access.requireOwner().contextWrite(ReactiveSecurityContextHolder.withAuthentication(owner)))
-            .assertNext(name -> assertThat(name).isEqualTo("owner")).verifyComplete();
-    }
-
-    @Test
-    void ordinaryUserCannotClaimAnUninitializedNotebook() {
-        var client = mock(ReactiveExtensionClient.class);
-        var users = mock(UserService.class);
-        when(users.hasSufficientRoles(any())).thenReturn(Mono.just(false));
-        var access = new DiaryAccess(client, users, mock(ReactiveSettingFetcher.class));
-        var other = UsernamePasswordAuthenticationToken.authenticated("other", "", List.of());
-        StepVerifier.create(access.initialize().contextWrite(ReactiveSecurityContextHolder.withAuthentication(other)))
-            .expectError(ResponseStatusException.class).verify();
-        verifyNoInteractions(client);
+    void loginAloneDoesNotGrantManagePermission() {
+        var access = access(false);
+        StepVerifier.create(access.canManage().contextWrite(ReactiveSecurityContextHolder.withAuthentication(account("other"))))
+            .expectNext(false).verifyComplete();
     }
 
     @Test
     void stickyNoteUsesPluginSettingAndFallsBackToDefault() {
         var settings = mock(ReactiveSettingFetcher.class);
-        var access = new DiaryAccess(mock(ReactiveExtensionClient.class), mock(UserService.class), settings);
+        var access = new DiaryAccess(mock(UserService.class), settings);
 
         when(settings.fetch(eq("basic"), eq(DiaryAccess.BasicSettings.class)))
             .thenReturn(Mono.just(new DiaryAccess.BasicSettings("Asia/Shanghai", "  给自己留一句。  ")));

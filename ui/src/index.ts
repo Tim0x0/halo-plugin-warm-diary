@@ -11,7 +11,7 @@ export default definePlugin({
         path: '/warm-diary/deleted',
         name: 'WarmDiaryTrash',
         component: () => import('./views/DiaryConsoleView.vue'),
-        meta: { title: '日记回收站', searchable: false, permissions: ['*'] },
+        meta: { title: '日记回收站', searchable: false, permissions: ['plugin:warm-diary:manage'] },
       },
     },
     {
@@ -23,7 +23,7 @@ export default definePlugin({
         meta: {
           title: '日记',
           searchable: true,
-          permissions: ['*'],
+          permissions: ['plugin:warm-diary:manage'],
           menu: {
             name: '日记',
             group: 'content',

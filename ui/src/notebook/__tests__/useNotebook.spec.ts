@@ -103,19 +103,17 @@ const publicSummary: PublicSummary = {
   weather: publicEntry.weather,
   publishedAt: publicEntry.publishedAt,
 }
-const ownerSession = {
-  canInitialize: false,
-  initialized: true,
-  isOwner: true,
+const managerSession = {
+  canManage: true,
   loggedIn: true,
   today: '2026-09-20',
   timeZone: 'Asia/Shanghai',
 }
-const ownerPage = { items: [summaryOf(entry), summaryOf(second)], total: 2, page: 1, size: 12 }
+const managerPage = { items: [summaryOf(entry), summaryOf(second)], total: 2, page: 1, size: 12 }
 const publicPage = { items: [publicSummary], total: 1, page: 1, size: 12 }
 // 打开一篇时按名称取完整内容；访客（或访客预览）只拿到分享版本。
 const owned: Record<string, Entry> = { 'entry-a': entry, 'entry-b': second }
-let ownerReads = true
+let managerReads = true
 let wrapper: VueWrapper
 async function setup(path = '/diary') {
   const router = createNotebookRouter(createMemoryHistory())
@@ -136,13 +134,13 @@ async function setup(path = '/diary') {
 }
 beforeEach(() => {
   vi.resetAllMocks()
-  ownerReads = true
-  getDiarySession().mockResolvedValue(asData(ownerSession))
+  managerReads = true
+  getDiarySession().mockResolvedValue(asData(managerSession))
   listReadableEntries().mockImplementation(async (request) =>
-    asData(request?.publicOnly || !ownerReads ? publicPage : ownerPage),
+    asData(request?.publicOnly || !managerReads ? publicPage : managerPage),
   )
   getReadableEntry().mockImplementation(async (request) => {
-    if (request.publicOnly || !ownerReads) {
+    if (request.publicOnly || !managerReads) {
       if (request.name === publicEntry.name) return asData(publicEntry)
       throw { response: { status: 404 } }
     }
@@ -201,7 +199,7 @@ describe('notebook navigation and server-authorized reading', () => {
     expect(state.entries.value).toHaveLength(2)
     expect(state.selected.value?.name).toBe('entry-a')
     const shared = { ...summaryOf(entry), shared: true, version: '2' }
-    finish(asData({ ...ownerPage, items: [shared, summaryOf(second)] }))
+    finish(asData({ ...managerPage, items: [shared, summaryOf(second)] }))
     getReadableEntry().mockResolvedValueOnce(
       asData({ ...entry, version: '2', published: publicEntry, pendingChanges: false }),
     )
@@ -220,7 +218,7 @@ describe('notebook navigation and server-authorized reading', () => {
     await flushPromises()
     expect(state.selected.value?.name).toBe('entry-b')
     state.keyword.value = '没有结果'
-    listReadableEntries().mockResolvedValueOnce(asData({ ...ownerPage, items: [], total: 0 }))
+    listReadableEntries().mockResolvedValueOnce(asData({ ...managerPage, items: [], total: 0 }))
     await state.filter()
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/diary')
@@ -242,7 +240,7 @@ describe('notebook navigation and server-authorized reading', () => {
     const { state } = await setup('/diary/entry/old-entry')
     state.keyword.value = 'B'
     listReadableEntries().mockResolvedValueOnce(
-      asData({ ...ownerPage, items: [summaryOf(second)], total: 1 }),
+      asData({ ...managerPage, items: [summaryOf(second)], total: 1 }),
     )
     await state.filter()
     await flushPromises()
@@ -275,7 +273,7 @@ describe('notebook navigation and server-authorized reading', () => {
     const { state } = await setup()
     expect(state.error.value).toBe('加载失败')
     await state.load()
-    expect(state.session.value?.isOwner).toBe(true)
+    expect(state.session.value?.canManage).toBe(true)
     expect(state.selected.value?.name).toBe(entry.name)
   })
 
@@ -301,7 +299,7 @@ describe('notebook navigation and server-authorized reading', () => {
   it('corrects an empty last index page without losing a linked detail', async () => {
     listReadableEntries().mockResolvedValueOnce(
       asData({
-        ...ownerPage,
+        ...managerPage,
         items: [],
         total: 12,
         page: 2,
@@ -314,7 +312,7 @@ describe('notebook navigation and server-authorized reading', () => {
     expect(state.selected.value?.name).toBe(second.name)
   })
 
-  it('uses the unified read API for the owner without selecting a private endpoint', async () => {
+  it('uses the unified read API for the manager without selecting a private endpoint', async () => {
     const { state } = await setup()
     expect(state.mine.value).toBe(true)
     expect(state.entries.value).toHaveLength(2)
@@ -324,9 +322,9 @@ describe('notebook navigation and server-authorized reading', () => {
     expect(listPrivateEntries()).not.toHaveBeenCalled()
   })
 
-  it.each([false, true])('uses that same API for a non-owner (loggedIn=%s)', async (loggedIn) => {
-    getDiarySession().mockResolvedValue(asData({ ...ownerSession, isOwner: false, loggedIn }))
-    ownerReads = false
+  it.each([false, true])('uses that same API for a non-manager (loggedIn=%s)', async (loggedIn) => {
+    getDiarySession().mockResolvedValue(asData({ ...managerSession, canManage: false, loggedIn }))
+    managerReads = false
     const { state } = await setup('/diary?view=private&visibility=private')
     expect(state.mine.value).toBe(false)
     expect(state.entries.value).toEqual([publicSummary])
@@ -341,9 +339,9 @@ describe('notebook navigation and server-authorized reading', () => {
 
   it('reads the mood and weather shared with the entry for a visitor', async () => {
     getDiarySession().mockResolvedValue(
-      asData({ ...ownerSession, isOwner: false, loggedIn: false }),
+      asData({ ...managerSession, canManage: false, loggedIn: false }),
     )
-    ownerReads = false
+    managerReads = false
     const { state } = await setup('/diary/entry/entry-b')
     expect(state.privateEntry.value).toBeUndefined()
     expect(state.content.value).toMatchObject({ mood: '平静', weather: '多云' })
@@ -419,8 +417,8 @@ describe('notebook navigation and server-authorized reading', () => {
     expect(state.visitorView.value).toBe(true)
   })
 
-  it.each([false, true])('blocks writing without owner access (loggedIn=%s)', async (loggedIn) => {
-    getDiarySession().mockResolvedValue(asData({ ...ownerSession, isOwner: false, loggedIn }))
+  it.each([false, true])('blocks writing without the manage role (loggedIn=%s)', async (loggedIn) => {
+    getDiarySession().mockResolvedValue(asData({ ...managerSession, canManage: false, loggedIn }))
     const { state } = await setup('/diary/write?entry=entry-a')
     expect(state.accessible.value).toBe(false)
     expect(state.editing.value).toBe(false)
@@ -439,7 +437,7 @@ describe('notebook navigation and server-authorized reading', () => {
     expect(getPrivateEntry()).not.toHaveBeenCalled()
   })
 
-  it('exits preview when entering the writer and returns to saved owner content', async () => {
+  it('exits preview when entering the writer and returns to saved manager content', async () => {
     const { state, router } = await setup()
     await state.switchView(true)
     await state.write(entry)
@@ -453,12 +451,12 @@ describe('notebook navigation and server-authorized reading', () => {
     expect(state.mine.value).toBe(true)
   })
 
-  it('refreshes identity when an old owner session expires or another account logs in', async () => {
+  it('refreshes identity when a manage session expires or another account logs in', async () => {
     const { state } = await setup()
     getDiarySession().mockResolvedValue(
-      asData({ ...ownerSession, isOwner: false, loggedIn: false }),
+      asData({ ...managerSession, canManage: false, loggedIn: false }),
     )
-    ownerReads = false
+    managerReads = false
     getReadableCalendar().mockClear()
     await state.load()
     expect(state.mine.value).toBe(false)

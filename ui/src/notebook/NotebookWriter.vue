@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 编辑器依赖 Halo 组件样式；只在主人写日记时随这个分块加载，访客页不需要。
+// 编辑器依赖 Halo 组件样式；只在管理账号写日记时随这个分块加载，访客页不需要。
 import '@halo-dev/components/dist/style.css'
 import '@halo-dev/richtext-editor/dist/style.css'
 import { contentMeta, draftHint, moods, weathers, type Entry } from '../diary/api'

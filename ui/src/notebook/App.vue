@@ -91,7 +91,7 @@ async function confirmed() {
       <RouterLink class="nb-brand" :to="directory"><SunMark />暖阳日记</RouterLink>
       <div class="nb-top-actions">
         <span class="nb-top-note">今天，也有好好生活。</span
-        ><template v-if="session?.isOwner"
+        ><template v-if="session?.canManage"
           ><button
             v-if="!editing"
             class="nb-link"
@@ -138,7 +138,7 @@ async function confirmed() {
           <h1>写给自己的日子</h1>
           <p>
             {{
-              session?.loggedIn ? '当前账号不是这本日记的主人。' : '登录站长账号后，才能写日记。'
+              session?.loggedIn ? '当前账号没有日记管理权限。' : '登录站长账号后，才能写日记。'
             }}
           </p>
           <a v-if="session?.loggedIn" class="nb-btn" href="/uc">管理当前账号</a>
@@ -205,7 +205,7 @@ async function confirmed() {
     </main>
     <footer class="nb-bottom">
       <span>一本日记，收好生活里的小小暖意。</span
-      ><a v-if="session?.isOwner" href="/console/warm-diary"
+      ><a v-if="session?.canManage" href="/console/warm-diary"
         >Halo 管理后台<IconLeave aria-hidden="true" /></a
       ><a v-else href="/">回到首页<IconLeave aria-hidden="true" /></a>
     </footer>

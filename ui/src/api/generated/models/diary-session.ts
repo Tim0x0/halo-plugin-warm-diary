@@ -25,19 +25,7 @@ export interface DiarySession {
      * @type {boolean}
      * @memberof DiarySession
      */
-    'canInitialize': boolean;
-    /**
-     * 
-     * @type {boolean}
-     * @memberof DiarySession
-     */
-    'initialized': boolean;
-    /**
-     * 
-     * @type {boolean}
-     * @memberof DiarySession
-     */
-    'isOwner': boolean;
+    'canManage': boolean;
     /**
      * 
      * @type {boolean}

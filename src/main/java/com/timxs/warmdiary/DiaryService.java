@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.TreeMap;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -157,14 +156,15 @@ public class DiaryService {
         return new ResponseStatusException(HttpStatus.NOT_FOUND, "日记不存在");
     }
 
-    Mono<DiaryEntry> owned(String name, String owner) {
+    /** 已存在且未在删除中的一篇日记；写权限由角色判定，不在这里过滤。 */
+    Mono<DiaryEntry> entry(String name) {
         return client.fetch(DiaryEntry.class, name)
-            .filter(e -> owner.equals(e.getSpec().getOwner()) && e.getMetadata().getDeletionTimestamp() == null)
+            .filter(e -> e.getMetadata().getDeletionTimestamp() == null)
             .switchIfEmpty(Mono.error(notFound()));
     }
 
     Mono<PrivateEntry> getPrivate(String name) {
-        return access.requireOwner().flatMap(owner -> owned(name, owner)).map(DiaryService::privateView);
+        return entry(name).map(DiaryService::privateView);
     }
 
     Mono<PublicEntry> getPublic(String name) {
@@ -173,35 +173,44 @@ public class DiaryService {
 
     // 页面和浏览器 API 都认 Halo 登录身份，不认路径。publicOnly 只能收窄到已分享快照，不能放开私密访问。
     Mono<ReadingEntry> getReadable(String name, boolean publicOnly) {
-        if (publicOnly) return getPublic(name).cast(ReadingEntry.class);
-        return access.requireOwner().flatMap(owner -> owned(name, owner))
-            .map(DiaryService::privateView)
-            .filter(entry -> entry.trashedAt() == null)
+        if (publicOnly) return readPublic(name);
+        return access.canManage().flatMap(manage -> manage ? readPrivate(name) : readPublic(name));
+    }
+
+    private Mono<ReadingEntry> readPrivate(String name) {
+        return entry(name).map(DiaryService::privateView)
+            .filter(e -> e.trashedAt() == null)
             .switchIfEmpty(Mono.error(notFound()))
-            .cast(ReadingEntry.class)
-            .onErrorResume(error -> forbidden(error) ? getPublic(name).cast(ReadingEntry.class) : Mono.error(error));
+            .cast(ReadingEntry.class);
+    }
+
+    private Mono<ReadingEntry> readPublic(String name) {
+        return getPublic(name).cast(ReadingEntry.class);
     }
 
     Mono<ReadingPage> listReadable(Query query, boolean publicOnly) {
         var readingQuery = new Query(query.page(), query.size(), query.keyword(), query.from(),
             query.to(), query.visibility(), query.mood(), query.weather(), false);
         if (publicOnly) return listPublic(readingQuery);
-        return access.requireOwner().flatMap(owner -> listPrivateFor(owner, readingQuery))
-            .map(page -> new ReadingPage(List.<ReadingSummary>copyOf(page.items()),
-                page.total(), page.page(), page.size()))
-            .onErrorResume(error -> forbidden(error) ? listPublic(readingQuery) : Mono.error(error));
+        return access.canManage()
+            .flatMap(manage -> manage ? listPrivateAsReading(readingQuery) : listPublic(readingQuery));
+    }
+
+    private Mono<ReadingPage> listPrivateAsReading(Query q) {
+        return listPrivate(q).map(page -> new ReadingPage(List.<ReadingSummary>copyOf(page.items()),
+            page.total(), page.page(), page.size()));
     }
 
     Mono<PrivateEntry> create(Write input) {
-        return access.requireOwner().flatMap(owner -> {
+        return access.username().defaultIfEmpty("").flatMap(author -> {
             var content = DiaryContent.validate(input);
             try {
                 if (input.name() == null || !UUID.fromString(input.name()).toString().equals(input.name())) throw new IllegalArgumentException();
             } catch (RuntimeException e) { return Mono.error(DiaryContent.badRequest("日记标识无效")); }
             // 客户端稳定 UUID，丢失创建响应后可以安全重试。
             return client.fetch(DiaryEntry.class, input.name()).flatMap(existing -> {
-                if (Objects.equals(existing.getSpec().getOwner(), owner)
-                    && existing.getSpec().getTrashedAt() == null && existing.getMetadata().getDeletionTimestamp() == null
+                if (existing.getSpec().getTrashedAt() == null
+                    && existing.getMetadata().getDeletionTimestamp() == null
                     && existing.getSpec().getWorking().equals(content)) return Mono.just(existing);
                 return Mono.error(new ResponseStatusException(HttpStatus.CONFLICT, "日记已经存在，请先获取最新版本"));
             }).switchIfEmpty(Mono.defer(() -> {
@@ -210,7 +219,7 @@ public class DiaryService {
                 metadata.setName(input.name());
                 entry.setMetadata(metadata);
                 var spec = new DiaryEntry.Spec();
-                spec.setOwner(owner);
+                spec.setAuthor(author);
                 spec.setWorking(content);
                 spec.setUpdatedAt(Instant.now());
                 entry.setSpec(spec);
@@ -220,7 +229,7 @@ public class DiaryService {
     }
 
     Mono<PrivateEntry> update(String name, Write input) {
-        return access.requireOwner().flatMap(owner -> owned(name, owner)).flatMap(e -> {
+        return entry(name).flatMap(e -> {
             checkVersion(e.getMetadata().getVersion(), input.version());
             if (e.getSpec().getTrashedAt() != null) return Mono.error(DiaryContent.badRequest("请先恢复这篇日记"));
             e.getSpec().setWorking(DiaryContent.validate(input));
@@ -230,7 +239,7 @@ public class DiaryService {
     }
 
     Mono<PrivateEntry> action(String name, String action, Version input) {
-        return access.requireOwner().flatMap(owner -> owned(name, owner)).flatMap(e -> {
+        return entry(name).flatMap(e -> {
             checkVersion(e.getMetadata().getVersion(), input.version());
             applyAction(e, action, Instant.now());
             return client.update(e);
@@ -255,21 +264,20 @@ public class DiaryService {
     }
 
     Mono<Void> delete(String name, Version input) {
-        return access.requireOwner().flatMap(owner -> owned(name, owner)).flatMap(e -> {
+        return entry(name).flatMap(e -> {
             checkVersion(e.getMetadata().getVersion(), input.version());
             if (e.getSpec().getTrashedAt() == null) return Mono.error(DiaryContent.badRequest("只有回收站中的日记可以永久删除"));
             return client.delete(e);
         }).then();
     }
 
-    private ListOptions options(Query q, boolean publicOnly, String owner) {
+    private ListOptions options(Query q, boolean publicOnly) {
         var builder = ListOptions.builder()
             .andQuery(Queries.isNull("metadata.deletionTimestamp"))
             .andQuery(Queries.equal("trashed", Boolean.toString(!publicOnly && q.trash())));
         if (publicOnly) builder.andQuery(Queries.equal("published", "true"));
-        else {
-            builder.andQuery(Queries.equal("spec.owner", owner));
-            if (!q.visibility().equals("all")) builder.andQuery(Queries.equal("published", Boolean.toString(q.visibility().equals("public"))));
+        else if (!q.visibility().equals("all")) {
+            builder.andQuery(Queries.equal("published", Boolean.toString(q.visibility().equals("public"))));
         }
         String dateIndex = publicOnly ? "publicDate" : "workingDate";
         if (!q.from().isBlank()) builder.andQuery(Queries.greaterThan(dateIndex, q.from(), true));
@@ -286,40 +294,31 @@ public class DiaryService {
     }
 
     Mono<EntryPage> listPrivate(Query q) {
-        return access.requireOwner().flatMap(owner -> listPrivateFor(owner, q));
-    }
-
-    private Mono<EntryPage> listPrivateFor(String owner, Query q) {
-        return client.listBy(DiaryEntry.class, options(q, false, owner),
+        return client.listBy(DiaryEntry.class, options(q, false),
             PageRequestImpl.of(q.page(), q.size(), sort(false)))
             .map(page -> new EntryPage(page.getItems().stream().map(DiaryService::summary).toList(), page.getTotal(), q.page(), q.size()));
     }
 
     private Mono<ReadingPage> listPublic(Query q) {
-        return client.listBy(DiaryEntry.class, options(q, true, ""), PageRequestImpl.of(q.page(), q.size(), sort(true)))
+        return client.listBy(DiaryEntry.class, options(q, true), PageRequestImpl.of(q.page(), q.size(), sort(true)))
             .map(page -> new ReadingPage(page.getItems().stream().<ReadingSummary>map(DiaryService::publicSummary).toList(),
                 page.getTotal(), q.page(), q.size()));
     }
 
-    // 主人看全部日记的当前日期；访客和访客预览只看已分享版本的日期。
+    // 有管理权限的账号看全部日记的当前日期；访客和访客预览只看已分享版本的日期。
     Mono<Map<String, Long>> readableCalendar(String month, boolean publicOnly) {
         final YearMonth yearMonth;
         try { yearMonth = YearMonth.parse(month); }
         catch (RuntimeException e) { return Mono.error(DiaryContent.badRequest("月份无效")); }
-        if (publicOnly) return calendarDays(yearMonth, "", true);
-        return access.requireOwner().flatMap(owner -> calendarDays(yearMonth, owner, false))
-            .onErrorResume(error -> forbidden(error) ? calendarDays(yearMonth, "", true) : Mono.error(error));
+        if (publicOnly) return calendarDays(yearMonth, true);
+        return access.canManage().flatMap(manage -> calendarDays(yearMonth, !manage));
     }
 
-    private Mono<Map<String, Long>> calendarDays(YearMonth yearMonth, String owner, boolean publicOnly) {
+    private Mono<Map<String, Long>> calendarDays(YearMonth yearMonth, boolean publicOnly) {
         var q = new Query(1, 100, "", yearMonth.atDay(1).toString(), yearMonth.atEndOfMonth().toString(), "all", "", "", false);
-        return client.listAll(DiaryEntry.class, options(q, publicOnly, owner), sort(publicOnly))
+        return client.listAll(DiaryEntry.class, options(q, publicOnly), sort(publicOnly))
             .collect(() -> new TreeMap<String, Long>(), (map, entry) -> map.merge(publicOnly
                 ? entry.getSpec().getPublished().date() : entry.getSpec().getWorking().date(), 1L, Long::sum))
             .map(map -> (Map<String, Long>) map);
-    }
-
-    private static boolean forbidden(Throwable error) {
-        return error instanceof ResponseStatusException response && response.getStatusCode().value() == 403;
     }
 }

@@ -44,40 +44,7 @@ halo {
     version = '2.26'
 }
 
-haloPlugin {
-    openApi {
-        useExistingServer = true
-        apiDocsUrl = providers.gradleProperty('haloApiUrl').getOrElse('http://127.0.0.1:8098')
-        outputDir = file("$rootDir/api-docs/openapi/v3_0")
-        groupingRules {
-            warmDiary {
-                displayName = 'Extension API for Warm Diary'
-                pathsToMatch = [
-                    '/apis/console.api.warm-diary.timxs.com/v1alpha1/**',
-                    '/apis/api.warm-diary.timxs.com/v1alpha1/**'
-                ]
-            }
-        }
-        groupedApiMappings = [
-            '/v3/api-docs/warmDiary': 'warmDiary.json'
-        ]
-        generator {
-            outputDir = file("${projectDir}/ui/src/api/generated")
-            additionalProperties = [
-                useES6: true,
-                useSingleRequestParameter: true,
-                withSeparateModelsAndApi: true,
-                apiPackage: 'api',
-                modelPackage: 'models'
-            ]
-            typeMappings = [
-                set: 'Array'
-            ]
-        }
-    }
-}
-
-tasks.register('processUiResources', Sync) {
+tasks.register('processUiResources', Copy) {
     from project(':ui').layout.buildDirectory.dir('dist')
     into layout.buildDirectory.dir('resources/main/ui')
     dependsOn project(':ui').tasks.named('assemble')
@@ -89,7 +56,7 @@ tasks.named('classes') {
     dependsOn tasks.named('processNotebookResources')
 }
 
-tasks.register('processNotebookResources', Sync) {
+tasks.register('processNotebookResources', Copy) {
     from project(':ui').layout.buildDirectory.dir('notebook')
     into layout.buildDirectory.dir('resources/main/static/notebook')
     dependsOn project(':ui').tasks.named('assemble')

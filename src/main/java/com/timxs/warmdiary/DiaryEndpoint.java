@@ -1,8 +1,6 @@
 package com.timxs.warmdiary;
 
 import static com.timxs.warmdiary.DiaryOpenApi.*;
-import static org.springdoc.core.fn.builders.parameter.Builder.parameterBuilder;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +22,6 @@ import run.halo.app.infra.ExternalUrlSupplier;
 @RequiredArgsConstructor
 public class DiaryEndpoint implements CustomEndpoint {
     private final DiaryService service;
-    private final DiaryAccess access;
     private final ExternalUrlSupplier externalUrl;
 
     @Override
@@ -55,18 +52,11 @@ public class DiaryEndpoint implements CustomEndpoint {
             .POST("/entries/{name}/delete", r -> readBody(r, DiaryService.Version.class)
                 .flatMap(v -> service.delete(r.pathVariable("name"), v)).then(ok().bodyValue(new Deleted(true))),
                 b -> DiaryOpenApi.body(named(operation(b, tag, "deleteEntry", Deleted.class)), DiaryService.Version.class))
-            .POST("/notebooks/-/initialize", r -> {
-                checkMutation(r);
-                return json(access.initialize().map(n -> new Initialized(true)));
-            }, b -> operation(b, tag, "initializeDiary", Initialized.class)
-                .parameter(parameterBuilder().in(ParameterIn.HEADER).name("X-Warm-Diary").required(true).implementation(String.class)))
             .build());
     }
 
     @Schema(name = "DiaryDeleted", requiredProperties = {"deleted"})
     public record Deleted(boolean deleted) {}
-    @Schema(name = "DiaryInitialized", requiredProperties = {"initialized"})
-    public record Initialized(boolean initialized) {}
 
     private Mono<ServerResponse> action(ServerRequest r, String action) {
         return json(readBody(r, DiaryService.Version.class).flatMap(v -> service.action(r.pathVariable("name"), action, v)));

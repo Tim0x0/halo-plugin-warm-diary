@@ -1,8 +1,7 @@
 {
   "extends": "@tsconfig/node24/tsconfig.json",
   "include": [
-    "vite.config.*",
-    "notebook.vite.config.ts",
+    "rsbuild.config.*",
     "vitest.config.*",
     "eslint.config.*"
   ],

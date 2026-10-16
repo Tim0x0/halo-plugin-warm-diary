@@ -7,8 +7,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -28,6 +28,7 @@ class DiaryPrivacyTest {
     void setup() {
         client = mock(ReactiveExtensionClient.class);
         access = mock(DiaryAccess.class);
+        when(access.username()).thenReturn(Mono.just("admin"));
         service = new DiaryService(client, access);
     }
 
@@ -36,14 +37,9 @@ class DiaryPrivacyTest {
         var m = new Metadata();
         m.setName(UUID.randomUUID().toString()); m.setVersion(7L); m.setCreationTimestamp(Instant.parse("2026-09-01T08:00:00Z"));
         e.setMetadata(m);
-        var spec = new DiaryEntry.Spec(); spec.setOwner("owner");
+        var spec = new DiaryEntry.Spec(); spec.setAuthor("admin");
         spec.setWorking(new DiaryEntry.Content("2026-09-20", "私密标题", "<p>私密正文</p>", "私密正文", "低落", "雨"));
         e.setSpec(spec); return e;
-    }
-
-    static DiaryNotebook notebook() {
-        var n = new DiaryNotebook(); var spec = new DiaryNotebook.Spec();
-        spec.setOwner("owner"); n.setSpec(spec); return n;
     }
 
     @Test
@@ -53,7 +49,7 @@ class DiaryPrivacyTest {
             "平静", "晴", Instant.parse("2026-09-10T08:00:00Z")));
         var json = new JsonMapper().writeValueAsString(DiaryService.publicView(e));
         assertThat(json).contains("2026-09-10", "公开标题", "旧版本", "平静", "晴")
-            .doesNotContain("私密", "2026-09-20", "低落", "雨", "owner", "version", "updatedAt", "working");
+            .doesNotContain("私密", "2026-09-20", "低落", "雨", "author", "version", "updatedAt", "working");
     }
 
     @Test
@@ -70,21 +66,6 @@ class DiaryPrivacyTest {
         assertThat(DiaryService.privateView(e).pendingChanges()).isTrue();
         assertThat(DiaryService.privateView(e).changedFields()).containsExactly("mood");
         assertThat(DiaryService.publicView(e).mood()).isEqualTo("低落");
-    }
-
-    @Test
-    void entriesSharedBeforeMoodAndWeatherWereSharedReadAsEmpty() {
-        var legacy = new JsonMapper().readValue("""
-            {"date":"2026-09-20","title":"私密标题","html":"<p>私密正文</p>","text":"私密正文",
-             "publishedAt":"2026-09-20T08:00:00Z"}""", DiaryEntry.Published.class);
-        assertThat(legacy.mood()).isEmpty();
-        assertThat(legacy.weather()).isEmpty();
-        var e = entry();
-        e.getSpec().setPublished(legacy);
-        // 早期版本没有分享心情和天气，提示主人更新分享。
-        assertThat(DiaryService.privateView(e).pendingChanges()).isTrue();
-        assertThat(DiaryService.privateView(e).changedFields()).contains("mood", "weather");
-        assertThat(DiaryService.publicView(e).mood()).isEmpty();
     }
 
     @Test
@@ -129,7 +110,7 @@ class DiaryPrivacyTest {
         assertThat(json).contains("\"excerpt\"", "\"shared\":true").doesNotContain("<p>", "尾巴", "\"html\"", "\"text\"");
         assertThat(DiaryService.summary(e).excerpt()).hasSize(80);
         var visitor = new JsonMapper().writeValueAsString(DiaryService.publicSummary(e));
-        assertThat(visitor).doesNotContain("<p>", "version", "working", "pendingChanges", "owner");
+        assertThat(visitor).doesNotContain("<p>", "version", "working", "pendingChanges", "author");
     }
 
     @Test
@@ -137,7 +118,6 @@ class DiaryPrivacyTest {
         var e = entry();
         DiaryService.applyAction(e, "publish", Instant.now());
         var original = e.getSpec().getPublished();
-        when(access.requireOwner()).thenReturn(Mono.just("owner"));
         when(client.fetch(DiaryEntry.class, e.getMetadata().getName())).thenReturn(Mono.just(e));
         when(client.update(any(DiaryEntry.class))).thenAnswer(call -> Mono.just(call.getArgument(0)));
         var input = new DiaryService.Write(null, "7", "2026-08-01", "新标题", "<p>新的未公开内容</p>", "平静", "晴");
@@ -153,7 +133,6 @@ class DiaryPrivacyTest {
     @Test
     void staleWriteAndStalePublishCannotOverwriteNewerVersion() {
         var e = entry();
-        when(access.requireOwner()).thenReturn(Mono.just("owner"));
         when(client.fetch(DiaryEntry.class, e.getMetadata().getName())).thenReturn(Mono.just(e));
         StepVerifier.create(service.update(e.getMetadata().getName(), new DiaryService.Write(null, "6", "2026-09-20", "覆盖", "<p>覆盖</p>", "", "")))
             .expectErrorMatches(ex -> ex instanceof ResponseStatusException r && r.getStatusCode().value() == 409).verify();
@@ -164,27 +143,30 @@ class DiaryPrivacyTest {
     }
 
     @Test
-    void nonOwnerCannotReadWriteOrExport() {
-        when(access.requireOwner()).thenReturn(Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN)));
-        StepVerifier.create(service.getPrivate("guessed-id")).expectError(ResponseStatusException.class).verify();
-        StepVerifier.create(service.create(new DiaryService.Write(UUID.randomUUID().toString(), null, "2026-09-20", "标题", "<p>内容</p>", "", "")))
-            .expectError(ResponseStatusException.class).verify();
-        verifyNoInteractions(client);
+    void createRecordsTheAuthorAndRequiresAStableClientId() {
+        var name = UUID.randomUUID().toString();
+        when(client.fetch(DiaryEntry.class, name)).thenReturn(Mono.empty());
+        when(client.create(any(DiaryEntry.class))).thenAnswer(call -> Mono.just(call.getArgument(0)));
+        StepVerifier.create(service.create(new DiaryService.Write(name, null, "2026-09-20", "标题", "<p>内容</p>", "", "")))
+            .assertNext(result -> assertThat(result.name()).isEqualTo(name))
+            .verifyComplete();
+        var created = ArgumentCaptor.forClass(DiaryEntry.class);
+        verify(client).create(created.capture());
+        assertThat(created.getValue().getSpec().getAuthor()).isEqualTo("admin");
+        assertThat(created.getValue().getSpec().getTrashedAt()).isNull();
+        assertThat(created.getValue().getSpec().getPublished()).isNull();
     }
 
     @Test
-    void ownerCannotAccidentallyReadAnotherOwnersRecord() {
-        var e = entry(); e.getSpec().setOwner("other");
-        when(access.requireOwner()).thenReturn(Mono.just("owner"));
-        when(client.fetch(eq(DiaryEntry.class), any(String.class))).thenReturn(Mono.just(e));
-        StepVerifier.create(service.getPrivate(e.getMetadata().getName())).expectErrorMatches(ex ->
-            ex instanceof ResponseStatusException r && r.getStatusCode().value() == 404).verify();
+    void writesWithoutAStableIdAreRejectedBeforeTouchingStorage() {
+        StepVerifier.create(service.create(new DiaryService.Write("not-a-uuid", null, "2026-09-20", "标题", "<p>内容</p>", "", "")))
+            .expectErrorMatches(ex -> ex instanceof ResponseStatusException r && r.getStatusCode().value() == 400).verify();
+        verifyNoInteractions(client);
     }
 
     @Test
     void lostCreateResponseCanBeRetriedWithoutCreatingDuplicatesOrPublishing() {
         var e = entry(); var w = e.getSpec().getWorking();
-        when(access.requireOwner()).thenReturn(Mono.just("owner"));
         when(client.fetch(DiaryEntry.class, e.getMetadata().getName())).thenReturn(Mono.just(e));
         StepVerifier.create(service.create(new DiaryService.Write(e.getMetadata().getName(), null, w.date(), w.title(), w.html(), w.mood(), w.weather())))
             .assertNext(result -> { assertThat(result.version()).isEqualTo("7"); assertThat(result.published()).isNull(); }).verifyComplete();

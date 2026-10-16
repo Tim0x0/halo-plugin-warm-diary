@@ -45,7 +45,7 @@ const pageOf = (items: Summary[], page = 1, total = items.length): Page => ({
   size: 20,
 })
 let wrapper: VueWrapper
-async function setup(path = '/warm-diary', isOwner = true) {
+async function setup(path = '/warm-diary', manage = true) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -54,19 +54,19 @@ async function setup(path = '/warm-diary', isOwner = true) {
     ],
   })
   await router.push(path)
-  const owner = ref(isOwner)
+  const manageRef = ref(manage)
   let state!: ReturnType<typeof useConsoleEntries>
   wrapper = mount(
     defineComponent({
       setup() {
-        state = useConsoleEntries(owner)
+        state = useConsoleEntries(manageRef)
         return () => h('div')
       },
     }),
     { global: { plugins: [router] } },
   )
   await flushPromises()
-  return { state, router, owner }
+  return { state, router, manage: manageRef }
 }
 beforeEach(() => {
   vi.resetAllMocks()
@@ -76,14 +76,14 @@ beforeEach(() => {
 afterEach(() => wrapper?.unmount())
 
 describe('Console list interactions', () => {
-  it('waits for ownership before loading private entries and clears them when ownership is lost', async () => {
-    const { state, owner } = await setup('/warm-diary', false)
+  it('waits for the manage role before loading private entries and clears them when it is lost', async () => {
+    const { state, manage } = await setup('/warm-diary', false)
     expect(listPrivateEntries()).not.toHaveBeenCalled()
-    owner.value = true
+    manage.value = true
     await flushPromises()
     state.checkedAll.value = true
     expect(state.selectedNames.value).toEqual(['entry-a', 'entry-b'])
-    owner.value = false
+    manage.value = false
     await flushPromises()
     expect(state.data.value.items).toEqual([])
     expect(state.selectedNames.value).toEqual([])

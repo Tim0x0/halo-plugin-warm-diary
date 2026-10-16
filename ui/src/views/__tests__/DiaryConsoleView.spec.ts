@@ -143,7 +143,7 @@ vi.mock('@/api', () => ({
     entry: { getDiarySession: vi.fn() },
   },
   diaryConsoleApiClient: {
-    entry: { initializeDiary: vi.fn(), listPrivateEntries: vi.fn(), getPrivateEntry: vi.fn() },
+    entry: { listPrivateEntries: vi.fn(), getPrivateEntry: vi.fn() },
   },
 }))
 vi.mock('../../diary/api', () => ({
@@ -169,14 +169,12 @@ const FilterDropdown = defineComponent({
 
 const emptyPage = { items: [], total: 0, page: 1, size: 20 }
 const baseSession = {
-  initialized: false,
-  isOwner: false,
+  canManage: false,
   loggedIn: true,
   timeZone: 'Asia/Shanghai',
   today: '2026-09-21',
-  canInitialize: false,
 }
-const ownerSession = { ...baseSession, initialized: true, isOwner: true }
+const managerSession = { ...baseSession, canManage: true }
 const privateEntry: Entry = {
   name: 'entry-a',
   version: '4',
@@ -232,7 +230,6 @@ function asData<T>(value: T) {
 const listPrivateEntries = () => vi.mocked(diaryConsoleApiClient.entry.listPrivateEntries)
 const getPrivateEntry = () => vi.mocked(diaryConsoleApiClient.entry.getPrivateEntry)
 const getDiarySession = () => vi.mocked(diaryPublicApiClient.entry.getDiarySession)
-const initializeDiary = () => vi.mocked(diaryConsoleApiClient.entry.initializeDiary)
 
 let wrapper: VueWrapper | undefined
 // 预览时取完整内容返回的那一版。
@@ -271,7 +268,6 @@ async function setup(session: typeof baseSession, path = '/warm-diary') {
 beforeEach(() => {
   vi.resetAllMocks()
   listPrivateEntries().mockResolvedValue(asData(emptyPage))
-  initializeDiary().mockResolvedValue(asData({ initialized: true }))
   currentEntry = privateEntry
   getPrivateEntry().mockImplementation(async () => asData(currentEntry))
 })
@@ -281,38 +277,13 @@ afterEach(() => {
   wrapper = undefined
 })
 
-describe('Console first-use access', () => {
-  it('offers initialization only to an uninitialized super administrator', async () => {
-    const view = await setup({ ...baseSession, canInitialize: true })
-
-    const start = view.get('button')
-    expect(start.text()).toBe('开始使用暖阳日记')
-    expect(view.text()).not.toContain('请让超级管理员先完成初始化')
-    expect(listPrivateEntries()).not.toHaveBeenCalled()
-
-    await start.trigger('click')
-    expect(initializeDiary()).toHaveBeenCalledOnce()
-  })
-
-  it('shows guidance without an initialization action to an ordinary account', async () => {
+describe('Console access', () => {
+  it('asks for the manage role instead of offering a claim action', async () => {
     const view = await setup(baseSession)
 
-    expect(view.text()).toContain('请让超级管理员先完成初始化')
-    expect(view.text()).not.toContain('开始使用暖阳日记')
-    expect(view.find('button').exists()).toBe(false)
-    expect(initializeDiary()).not.toHaveBeenCalled()
-    expect(listPrivateEntries()).not.toHaveBeenCalled()
-  })
-
-  it('does not expose initialization or writing to an initialized non-owner', async () => {
-    const view = await setup({ ...baseSession, initialized: true, canInitialize: true })
-
-    expect(view.text()).toContain('这是站长的日记本')
-    expect(view.text()).toContain('当前账号不能查看或管理未分享的日记')
-    expect(view.text()).not.toContain('开始使用暖阳日记')
+    expect(view.text()).toContain('需要日记管理权限')
+    expect(view.text()).toContain('「暖阳日记管理」角色')
     expect(view.text()).not.toContain('写日记')
-    expect(view.find('button').exists()).toBe(false)
-    expect(initializeDiary()).not.toHaveBeenCalled()
     expect(listPrivateEntries()).not.toHaveBeenCalled()
   })
 })
@@ -322,7 +293,7 @@ describe('Console visibility controls', () => {
     'opens a preview before publishing and does not write when the preview is dismissed with %s',
     async (dismiss) => {
       listPrivateEntries().mockResolvedValue(asData(pageOf(privateEntry)))
-      const view = await setup(ownerSession)
+      const view = await setup(managerSession)
 
       const visibility = view.get('button[aria-label="分享日记：秋日晴朗"]')
       expect(visibility.find('[data-icon="IconEyeOff"]').exists()).toBe(true)
@@ -360,7 +331,7 @@ describe('Console visibility controls', () => {
         finish = resolve
       }),
     )
-    const view = await setup(ownerSession)
+    const view = await setup(managerSession)
     const visibility = view.get('button[aria-label="分享日记：秋日晴朗"]')
     await visibility.trigger('click')
     const confirm = view
@@ -393,7 +364,7 @@ describe('Console visibility controls', () => {
       .mockResolvedValueOnce(asData(pageOf(publishedEntry)))
       .mockResolvedValue(asData(pageOf(withdrawn)))
     vi.mocked(mutateEntry).mockResolvedValueOnce(withdrawn)
-    const view = await setup(ownerSession)
+    const view = await setup(managerSession)
     await view.get('button[aria-label="收回分享：秋日晴朗"]').trigger('click')
 
     expect(Dialog.warning).toHaveBeenCalledExactlyOnceWith(
@@ -421,7 +392,7 @@ describe('Console visibility controls', () => {
 
 describe('Console date filter', () => {
   it('keeps an applied custom range editable instead of clearing it on click', async () => {
-    const view = await setup(ownerSession, '/warm-diary?from=2026-09-01&to=2026-09-10')
+    const view = await setup(managerSession, '/warm-diary?from=2026-09-01&to=2026-09-10')
     const dates = view
       .findAllComponents(FilterDropdown)
       .find((dropdown) => dropdown.props('label') === '日期')!

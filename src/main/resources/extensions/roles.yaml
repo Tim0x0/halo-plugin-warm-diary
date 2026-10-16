@@ -17,17 +17,20 @@ rules:
 apiVersion: v1alpha1
 kind: Role
 metadata:
-  name: warm-diary-owner-endpoints
+  name: warm-diary-manage
   labels:
     halo.run/role-template: "true"
-    halo.run/hidden: "true"
-    rbac.authorization.halo.run/aggregate-to-authenticated: "true"
+  annotations:
+    rbac.authorization.halo.run/display-name: "暖阳日记管理"
+    rbac.authorization.halo.run/module: "暖阳日记"
+    rbac.authorization.halo.run/ui-permissions: |
+      ["plugin:warm-diary:manage"]
 rules:
-  # Entry points only: every handler checks the single notebook owner.
-  # Never grant roles access to raw diaryentries / diarynotebooks CRDs.
+  # Entry points only: 写日记与读未分享内容都经这些端点，权限由角色判定。
+  # Never grant roles access to raw diaryentries CRDs.
   - apiGroups: ["console.api.warm-diary.timxs.com"]
     resources: ["entries"]
     verbs: ["get", "list", "create", "update"]
   - apiGroups: ["console.api.warm-diary.timxs.com"]
-    resources: ["entries/publish", "entries/unpublish", "entries/trash", "entries/restore", "entries/delete", "notebooks/initialize"]
+    resources: ["entries/publish", "entries/unpublish", "entries/trash", "entries/restore", "entries/delete"]
     verbs: ["create"]

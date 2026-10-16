@@ -82,7 +82,7 @@ const {
   load,
   mutating,
   operate,
-} = useConsoleEntries(computed(() => session.value?.isOwner === true))
+} = useConsoleEntries(computed(() => session.value?.canManage === true))
 const busy = computed(() => working.value || mutating.value)
 const editing = ref(false)
 const editEntry = ref<Entry>()
@@ -195,10 +195,10 @@ const dateForm = ref<{ node: { submit: () => void } }>()
 async function start() {
   starting.value = true
   sessionError.value = ''
-  const wasOwner = session.value?.isOwner
+  const wasManager = session.value?.canManage
   try {
     session.value = (await diaryPublicApiClient.entry.getDiarySession()).data
-    if (wasOwner && session.value.isOwner) await load()
+    if (wasManager && session.value.canManage) await load()
   } catch (e) {
     sessionError.value = message(e)
   } finally {
@@ -230,18 +230,6 @@ function read(item: Summary) {
 async function closeEditor() {
   editing.value = false
   await load()
-}
-async function initialize() {
-  working.value = true
-  try {
-    await diaryConsoleApiClient.entry.initializeDiary({ xWarmDiary: '1' })
-    await start()
-    Toast.success('暖阳日记已准备好')
-  } catch (e) {
-    sessionError.value = message(e)
-  } finally {
-    working.value = false
-  }
 }
 type Target = Summary | Entry
 const nameOf = (entry: Target) => title('working' in entry ? entry.working : entry)
@@ -296,10 +284,10 @@ function preview(item: Summary | Entry) {
       <template #actions>
         <div class="flex flex-wrap items-center justify-end gap-2">
           <VButton v-if="trash" :route="{ name: 'WarmDiary' }" size="sm">返回</VButton>
-          <VButton v-else-if="session?.isOwner" :route="{ name: 'WarmDiaryTrash' }" size="sm"
+          <VButton v-else-if="session?.canManage" :route="{ name: 'WarmDiaryTrash' }" size="sm"
             >回收站</VButton
           >
-          <VButton v-if="session?.isOwner" type="secondary" :disabled="busy" @click="edit()">
+          <VButton v-if="session?.canManage" type="secondary" :disabled="busy" @click="edit()">
             <template #icon><IconAddCircle /></template>写日记
           </VButton>
         </div>
@@ -319,27 +307,12 @@ function preview(item: Summary | Entry) {
         ></VCard
       >
       <VLoading v-else-if="starting && !session" />
-      <VCard v-else-if="session && !session.initialized">
-        <VEmpty
-          title="为自己留一本日记"
-          message="仅需首次设置：当前超级管理员将成为日记主人，之后只有这个账号能写日记和查看未分享的内容。"
-        >
-          <template #actions>
-            <VButton
-              v-if="session.canInitialize"
-              type="secondary"
-              :loading="busy"
-              @click="initialize"
-              >开始使用暖阳日记</VButton
-            >
-            <span v-else class="text-sm text-gray-500">请让超级管理员先完成初始化</span>
-          </template>
-        </VEmpty>
-      </VCard>
-      <VCard v-else-if="session && !session.isOwner"
-        ><VEmpty title="这是站长的日记本" message="当前账号不能查看或管理未分享的日记。"
+      <VCard v-else-if="session && !session.canManage"
+        ><VEmpty
+          title="需要日记管理权限"
+          message="当前账号没有「暖阳日记管理」角色，不能查看或管理未分享的日记。"
       /></VCard>
-      <VCard v-else-if="session?.isOwner" :body-class="['!p-0']">
+      <VCard v-else-if="session?.canManage" :body-class="['!p-0']">
         <template #header>
           <!-- Layout and global controls follow Halo 2.26's PostList. -->
           <div class="block w-full bg-gray-50 px-4 py-3">

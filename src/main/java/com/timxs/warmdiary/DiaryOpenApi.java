@@ -30,7 +30,7 @@ final class DiaryOpenApi {
                 .mediaType(MediaType.APPLICATION_JSON_VALUE).schema(schemaBuilder().implementation(type))));
     }
 
-    static Builder filters(Builder b, boolean owner) {
+    static Builder filters(Builder b, boolean manage) {
         b.parameter(parameterBuilder().in(ParameterIn.QUERY).name("page").implementation(Integer.class))
             .parameter(parameterBuilder().in(ParameterIn.QUERY).name("size").implementation(Integer.class))
             .parameter(parameterBuilder().in(ParameterIn.QUERY).name("keyword").implementation(String.class))
@@ -38,7 +38,7 @@ final class DiaryOpenApi {
             .parameter(parameterBuilder().in(ParameterIn.QUERY).name("to").implementation(String.class))
             .parameter(parameterBuilder().in(ParameterIn.QUERY).name("mood").implementation(String.class))
             .parameter(parameterBuilder().in(ParameterIn.QUERY).name("weather").implementation(String.class));
-        if (owner) b.parameter(parameterBuilder().in(ParameterIn.QUERY).name("visibility").implementation(String.class))
+        if (manage) b.parameter(parameterBuilder().in(ParameterIn.QUERY).name("visibility").implementation(String.class))
             .parameter(parameterBuilder().in(ParameterIn.QUERY).name("trash").implementation(Boolean.class));
         return b;
     }

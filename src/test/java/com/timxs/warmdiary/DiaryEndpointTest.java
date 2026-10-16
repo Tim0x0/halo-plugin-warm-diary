@@ -7,19 +7,15 @@ import java.net.URI;
 import java.net.URL;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import reactor.core.publisher.Mono;
 import run.halo.app.extension.ReactiveExtensionClient;
 import run.halo.app.infra.ExternalUrlSupplier;
 
 class DiaryEndpointTest {
-    private static final String INITIALIZE = "http://localhost/notebooks/-/initialize";
-
     static WebTestClient client(String externalUrl) {
         var access = mock(DiaryAccess.class);
         var supplier = mock(ExternalUrlSupplier.class);
         if (externalUrl != null) when(supplier.getRaw()).thenReturn(url(externalUrl));
-        when(access.initialize()).thenReturn(Mono.just(DiaryPrivacyTest.notebook()));
-        var endpoint = new DiaryEndpoint(new DiaryService(mock(ReactiveExtensionClient.class), access), access, supplier);
+        var endpoint = new DiaryEndpoint(new DiaryService(mock(ReactiveExtensionClient.class), access), supplier);
         return WebTestClient.bindToRouterFunction(endpoint.endpoint()).build();
     }
 
@@ -31,8 +27,9 @@ class DiaryEndpointTest {
         }
     }
 
-    private static WebTestClient.ResponseSpec initialize(WebTestClient client, String origin, boolean header) {
-        var request = client.post().uri(INITIALIZE);
+    // 写操作都带 X-Warm-Diary 与本站 Origin；过了这道校验就没有请求体，因此回 400。
+    private static WebTestClient.ResponseSpec write(WebTestClient client, String origin, boolean header) {
+        var request = client.post().uri("http://localhost/entries");
         if (header) request = request.header("X-Warm-Diary", "1");
         if (origin != null) request = request.header("Origin", origin);
         return request.exchange();
@@ -41,19 +38,19 @@ class DiaryEndpointTest {
     @Test
     void writesRequireTheDiaryHeaderAndAFirstPartyOrigin() {
         var client = client("https://blog.example.test");
-        initialize(client, null, false).expectStatus().isForbidden();
-        client.post().uri(INITIALIZE).header("X-Warm-Diary", "1").header("Sec-Fetch-Site", "cross-site")
+        write(client, null, false).expectStatus().isForbidden();
+        client.post().uri("http://localhost/entries").header("X-Warm-Diary", "1").header("Sec-Fetch-Site", "cross-site")
             .exchange().expectStatus().isForbidden();
-        initialize(client, "https://evil.example.test", true).expectStatus().isForbidden();
+        write(client, "https://evil.example.test", true).expectStatus().isForbidden();
         // 反向代理未转发 X-Forwarded-* 时，请求地址和站点对外地址都算本站。
-        initialize(client, "http://localhost", true).expectStatus().isOk();
-        initialize(client, "https://blog.example.test", true).expectStatus().isOk();
+        write(client, "http://localhost", true).expectStatus().isBadRequest();
+        write(client, "https://blog.example.test", true).expectStatus().isBadRequest();
     }
 
     @Test
     void withoutAnExternalUrlOnlyTheRequestOriginIsAccepted() {
         var client = client(null);
-        initialize(client, "http://localhost", true).expectStatus().isOk();
-        initialize(client, "https://blog.example.test", true).expectStatus().isForbidden();
+        write(client, "http://localhost", true).expectStatus().isBadRequest();
+        write(client, "https://blog.example.test", true).expectStatus().isForbidden();
     }
 }

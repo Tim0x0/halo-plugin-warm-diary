@@ -16,7 +16,8 @@ public class DiaryEntry extends AbstractExtension {
 
     @Data
     public static class Spec {
-        private String owner;
+        // 记录谁写的，仅供以后展示；权限由角色判定，不参与过滤。
+        private String author;
         private Content working;
         private Published published;
         private Instant updatedAt;
@@ -25,21 +26,10 @@ public class DiaryEntry extends AbstractExtension {
 
     @Schema(name = "DiaryContent", requiredProperties = {"date", "title", "html", "text", "mood", "weather"})
     public record Content(String date, String title, String html, String text,
-                          String mood, String weather) {
-        public Content {
-            mood = mood == null ? "" : mood;
-            weather = weather == null ? "" : weather;
-        }
-    }
+                          String mood, String weather) {}
 
-    // 心情和天气随日记一起分享；早期分享快照可能没有这两项，读出为空。
     @Schema(name = "DiaryPublished",
         requiredProperties = {"date", "title", "html", "text", "mood", "weather", "publishedAt"})
     public record Published(String date, String title, String html, String text,
-                            String mood, String weather, Instant publishedAt) {
-        public Published {
-            mood = mood == null ? "" : mood;
-            weather = weather == null ? "" : weather;
-        }
-    }
+                            String mood, String weather, Instant publishedAt) {}
 }

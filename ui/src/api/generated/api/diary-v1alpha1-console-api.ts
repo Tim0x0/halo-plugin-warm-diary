@@ -26,8 +26,6 @@ import type { DiaryDeleted } from '../models';
 // @ts-ignore
 import type { DiaryEntryPage } from '../models';
 // @ts-ignore
-import type { DiaryInitialized } from '../models';
-// @ts-ignore
 import type { DiaryPrivateEntry } from '../models';
 // @ts-ignore
 import type { DiaryVersion } from '../models';
@@ -172,50 +170,6 @@ export const DiaryV1alpha1ConsoleApiAxiosParamCreator = function (configuration?
             // authentication bearerAuth required
             // http bearer authentication required
             await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-
-    
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
-         * @param {string} xWarmDiary 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        initializeDiary: async (xWarmDiary: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'xWarmDiary' is not null or undefined
-            assertParamExists('initializeDiary', 'xWarmDiary', xWarmDiary)
-            const localVarPath = `/apis/console.api.warm-diary.timxs.com/v1alpha1/notebooks/-/initialize`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication basicAuth required
-            // http basic authentication required
-            setBasicAuthToObject(localVarRequestOptions, configuration)
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-            if (xWarmDiary != null) {
-                localVarHeaderParameter['X-Warm-Diary'] = String(xWarmDiary);
-            }
 
 
     
@@ -631,18 +585,6 @@ export const DiaryV1alpha1ConsoleApiFp = function(configuration?: Configuration)
         },
         /**
          * 
-         * @param {string} xWarmDiary 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async initializeDiary(xWarmDiary: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<DiaryInitialized>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.initializeDiary(xWarmDiary, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DiaryV1alpha1ConsoleApi.initializeDiary']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 
          * @param {number} [page] 
          * @param {number} [size] 
          * @param {string} [keyword] 
@@ -770,15 +712,6 @@ export const DiaryV1alpha1ConsoleApiFactory = function (configuration?: Configur
         },
         /**
          * 
-         * @param {DiaryV1alpha1ConsoleApiInitializeDiaryRequest} requestParameters Request parameters.
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        initializeDiary(requestParameters: DiaryV1alpha1ConsoleApiInitializeDiaryRequest, options?: RawAxiosRequestConfig): AxiosPromise<DiaryInitialized> {
-            return localVarFp.initializeDiary(requestParameters.xWarmDiary, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
          * @param {DiaryV1alpha1ConsoleApiListPrivateEntriesRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -895,20 +828,6 @@ export interface DiaryV1alpha1ConsoleApiGetPrivateEntryRequest {
      * @memberof DiaryV1alpha1ConsoleApiGetPrivateEntry
      */
     readonly name: string
-}
-
-/**
- * Request parameters for initializeDiary operation in DiaryV1alpha1ConsoleApi.
- * @export
- * @interface DiaryV1alpha1ConsoleApiInitializeDiaryRequest
- */
-export interface DiaryV1alpha1ConsoleApiInitializeDiaryRequest {
-    /**
-     * 
-     * @type {string}
-     * @memberof DiaryV1alpha1ConsoleApiInitializeDiary
-     */
-    readonly xWarmDiary: string
 }
 
 /**
@@ -1159,17 +1078,6 @@ export class DiaryV1alpha1ConsoleApi extends BaseAPI {
      */
     public getPrivateEntry(requestParameters: DiaryV1alpha1ConsoleApiGetPrivateEntryRequest, options?: RawAxiosRequestConfig) {
         return DiaryV1alpha1ConsoleApiFp(this.configuration).getPrivateEntry(requestParameters.name, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @param {DiaryV1alpha1ConsoleApiInitializeDiaryRequest} requestParameters Request parameters.
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof DiaryV1alpha1ConsoleApi
-     */
-    public initializeDiary(requestParameters: DiaryV1alpha1ConsoleApiInitializeDiaryRequest, options?: RawAxiosRequestConfig) {
-        return DiaryV1alpha1ConsoleApiFp(this.configuration).initializeDiary(requestParameters.xWarmDiary, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

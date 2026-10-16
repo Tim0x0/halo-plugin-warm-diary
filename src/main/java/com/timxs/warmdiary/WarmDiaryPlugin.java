@@ -26,10 +26,7 @@ public class WarmDiaryPlugin extends BasePlugin {
 
     @Override
     public void start() {
-        schemes.register(DiaryNotebook.class);
         schemes.register(DiaryEntry.class, specs -> {
-            specs.add(IndexSpecs.<DiaryEntry, String>single("spec.owner", String.class)
-                .indexFunc(e -> e.getSpec().getOwner()));
             specs.add(IndexSpecs.<DiaryEntry, String>single("workingDate", String.class)
                 .indexFunc(e -> e.getSpec().getWorking().date()));
             specs.add(IndexSpecs.<DiaryEntry, String>single("publicDate", String.class)
@@ -57,7 +54,6 @@ public class WarmDiaryPlugin extends BasePlugin {
     @Override
     public void stop() {
         schemes.unregister(Scheme.buildFromType(DiaryEntry.class));
-        schemes.unregister(Scheme.buildFromType(DiaryNotebook.class));
     }
 
     // SingleValueIndex 常驻堆；contains 全量扫描，截断后仍可搜标题和正文前部。

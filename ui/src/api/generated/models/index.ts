@@ -3,7 +3,6 @@ export * from './diary-content';
 export * from './diary-deleted';
 export * from './diary-entry-page';
 export * from './diary-entry-summary';
-export * from './diary-initialized';
 export * from './diary-private-entry';
 export * from './diary-public-entry';
 export * from './diary-public-summary';

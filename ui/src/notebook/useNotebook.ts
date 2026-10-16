@@ -26,7 +26,7 @@ export function useNotebook(canLeave: () => Promise<boolean>) {
   const directory = '/diary'
   const writing = computed(() => route.path === `${directory}/write`)
   const visitorView = ref(false)
-  const mine = computed(() => !!session.value?.isOwner && !visitorView.value)
+  const mine = computed(() => !!session.value?.canManage && !visitorView.value)
   const loading = ref(true),
     opening = ref(false),
     error = ref(''),
@@ -56,7 +56,7 @@ export function useNotebook(canLeave: () => Promise<boolean>) {
   const content = computed(
     () => selected.value && ('working' in selected.value ? selected.value.working : selected.value),
   )
-  const accessible = computed(() => !!session.value && (!writing.value || session.value.isOwner))
+  const accessible = computed(() => !!session.value && (!writing.value || session.value.canManage))
   const filtered = computed(
     () => !!(queryText('q') || month.value || selectedDate.value || visibility.value !== 'all'),
   )
@@ -135,7 +135,7 @@ export function useNotebook(canLeave: () => Promise<boolean>) {
       return
     }
     try {
-      // 主人看全部日记；访客和访客预览只统计已分享的日期。
+      // 管理账号看全部日记；访客和访客预览只统计已分享的日期。
       const result = (
         await diaryPublicApiClient.entry.getReadableCalendar({
           month: calendarMonth.value,
@@ -168,7 +168,7 @@ export function useNotebook(canLeave: () => Promise<boolean>) {
   // 筛选和翻页也保留上一份目录，等新结果回来再替换；只有切换访客视图才清空。
   async function load(soft = false) {
     const request = ++requestId
-    const shownOwner = session.value?.isOwner
+    const shownManager = session.value?.canManage
     shownList = ''
     listing.value = true
     if (soft || selected.value) {
@@ -189,9 +189,9 @@ export function useNotebook(canLeave: () => Promise<boolean>) {
       const currentSession = await sessionRequest
       if (request !== requestId) return
       // 身份变了（如登录过期），不能把按原身份读到的内容留在屏幕上。
-      if (soft && currentSession.isOwner !== shownOwner) clearReading()
+      if (soft && currentSession.canManage !== shownManager) clearReading()
       session.value = currentSession
-      if (!currentSession.isOwner) visitorView.value = false
+      if (!currentSession.canManage) visitorView.value = false
       readQuery()
       if (!accessible.value) {
         selected.value = undefined
@@ -387,7 +387,7 @@ export function useNotebook(canLeave: () => Promise<boolean>) {
   }
   async function switchView(publicOnly: boolean) {
     if (
-      !session.value?.isOwner ||
+      !session.value?.canManage ||
       editing.value ||
       busy.value ||
       loading.value ||

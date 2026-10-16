@@ -3,14 +3,14 @@
   "type": "module",
   "scripts": {
     "build": "run-p type-check \"build-only {@}\" -- && pnpm run build:notebook",
-    "build-only": "vite build",
-    "build:notebook": "vite build --config notebook.vite.config.ts",
-    "dev": "vite build --watch --mode=development",
+    "build-only": "rsbuild build",
+    "build:notebook": "rsbuild build --config notebook.rsbuild.config.ts",
+    "dev": "rsbuild build --watch --env-mode=development",
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
     "lint": "run-s \"lint:*\"",
     "format": "prettier --write --experimental-cli src/",
-    "test:unit": "vitest run --passWithNoTests",
+    "test:unit": "vitest --passWithNoTests",
     "type-check": "vue-tsc --build"
   },
   "dependencies": {
@@ -25,6 +25,9 @@
     "vue-router": "~5.1.0"
   },
   "devDependencies": {
+    "@rsbuild/core": "^2.1.11",
+    "@rsbuild/plugin-sass": "^2.0.1",
+    "@rsbuild/plugin-vue": "^2.0.1",
     "@halo-dev/ui-plugin-bundler-kit": "^2.26.0",
     "@iconify-json/ri": "^1.2.10",
     "@tsconfig/node24": "^24.0.4",
@@ -46,7 +49,6 @@
     "prettier": "3.9.6",
     "typescript": "~6.0.0",
     "unplugin-icons": "^23.0.1",
-    "vite": "^8.2.0",
     "vitest": "^4.1.10",
     "vue-tsc": "^3.3.7",
     "@vue/server-renderer": "3.5.41"

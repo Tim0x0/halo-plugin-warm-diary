@@ -7,7 +7,7 @@ import { pendingLabel } from '../diary/wording'
 // 一页日记的正文。阅读页和分享预览共用，预览看到的就是访客看到的样子。
 defineProps<{
   content: Pick<Content, 'date' | 'title' | 'html' | 'mood' | 'weather'> & { text?: string }
-  /** 只有主人看得到的分享状态；访客页和预览不传。 */
+  /** 只有管理账号看得到的分享状态；访客页和预览不传。 */
   status?: { published: boolean; pending: boolean }
 }>()
 </script>
